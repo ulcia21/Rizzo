@@ -71,7 +71,7 @@ let rec check env chanEnv te ty =
         | None -> false 
     | Chan k ->
         match List.tryFind (fun (y,_)-> k=y) chanEnv with
-        | Some (_, t) -> TChannel t = ty // is this how we are supposed to do channels? tChan is supposed to have type TChannel. chanEnv is a pair (Channel, TChannel t) where t is a type
+        | Some (_, t) -> TChannel t = ty 
         | None -> false
     | Ann (t, typ) -> typ = ty && check env chanEnv t typ
     | Lambda (x, t) ->
@@ -174,7 +174,7 @@ and infer env chanEnv te =
         | Some (_, t)-> Some t
         | None -> None
     | Chan k -> 
-        match List.tryFind (fun (y,_) -> k = y) chanEnv with // how to tell the compiler that there are onnly TChannels in this chanEnv?
+        match List.tryFind (fun (y,_) -> k = y) chanEnv with
         | Some (_, t)-> Some (TChannel t)
         | None -> None
     | Ann (t, ty) ->
@@ -250,7 +250,6 @@ and infer env chanEnv te =
     | _ -> None
 
 // no in, no lambda and Never in infer
-// to be done - add channel context, add chanells and second half of Terms
 
 type Env = (string * Type) list
 type ChanEnv = (Channel *Type) list 
