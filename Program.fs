@@ -41,7 +41,6 @@ type Term =
     | Never 
     | Num of int
     | Add of Term * Term 
-// what with values are they in the same block or separete block?
 
 let rec isValue t =
     match t with
@@ -64,7 +63,6 @@ let rec isValue t =
 let rec check env chanEnv te ty = 
     match te with
     | Unit -> ty = TUnit
-    //| Chan -> what about this rule? 
     | Var x -> 
         match List.tryFind (fun (y,_)-> x=y) env with
         | Some (_, t) -> t = ty
