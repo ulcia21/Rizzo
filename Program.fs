@@ -285,32 +285,41 @@ let rec mkSig da  = Lambda("a", SignalCons(Var "a", mkSig (Wait da)) ) //wheneve
 //switch
 
 //map
-let map = Fix ("r",
-                    Ann(Lambda ("f", 
-                        Ann(Lambda ("s", 
+let map3 = Fix ("r",
+                    Lambda ("f", 
+                        Lambda ("s", 
                             App ( 
-                                Ann(Lambda ("x", 
+                                Lambda ("x", 
                                     App(
-                                        Ann(Lambda ("xs",
-                                            App (Var "f",
-                                                SignalCons(Var "x",
-                                                    Delay(
-                                                        ApplyWhenV (
-                                                            ApplyLater(
-                                                                App(Ann(Lambda("r1", Var "r1"), TFun(TInt, TInt)),
-                                                                    Var "f"),
-                                                            Var "r"), 
-                                                        Var "xs")
-                                                    )
-                                                )
+                                        Lambda ("xs",
+                                            SignalCons(App (Var "f", Var "x"),
+                                                ApplyWhenV (
+                                                    ApplyLater(
+                                                        Delay(
+                                                            Lambda("r1", App(Var "r1", Var "f"))
+                                                        ),
+                                                    Var "r"), 
+                                                Var "xs")
                                             )
-                                        ), TFun(TInt, TSignal TInt))
+                                        ) 
                                     , Tail (Var "s"))
-                                ), TFun(TInt, TSignal TInt)),
+                                ),
                             Head (Var "s") )
-                        ), TFun(TInt, TSignal TInt))
-                    ), TFun( TInt, TSignal TInt))
+                        )
+                    )
                 )
+
+let mapType =
+    TFun(
+        TFun(TUnit, TUnit),
+        TFun(TSignal TUnit, TSignal TUnit)
+    )
+
+let mapAnnotated =
+    Ann(map3, mapType)
+
+let result = check env chanEnv mapAnnotated mapType
+printfn "result of map3 = %b, and its supposed to be true" result
 
 
 
