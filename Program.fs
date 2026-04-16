@@ -283,7 +283,16 @@ printfn "check3 = %b, and its supposed to be true" check3
 //mkSig
 let rec mkSig da  = Lambda("a", SignalCons(Var "a", mkSig (Wait da)) ) //whenever da updates we construct the signal from a
 // the type should be Exists A -> Exists Sig A
-//not sure if that's it. Should I also annotate this thing?
+let mkSigType =
+    TFun(
+        TExistsLater TUnit,
+        TExistsLater(TSignal TUnit))
+
+//let mkSigAnnotated =
+    //Ann(mkSig (Chan "someChannel?"), mkSigType)
+
+//let resultmkSig = check env chanEnv mkSigAnnotated mkSigType
+//printfn "result of mkSig = %b, and its supposed to be true" resultmkSig its some infinite loop :0
 
 //switch
 
@@ -321,8 +330,8 @@ let mapType =
 let mapAnnotated =
     Ann(map3, mapType)
 
-let result = check env chanEnv mapAnnotated mapType
-printfn "result of map3 = %b, and its supposed to be true" result
+let resultmap = check env chanEnv mapAnnotated mapType
+printfn "result of map3 = %b, and its supposed to be true" resultmap
 
 
 
