@@ -76,10 +76,11 @@ let rec check env chanEnv te ty =
         match ty with
         | TFun (a, b) -> check ((x,a)::env) chanEnv t b
         | _ -> false
-    | App (t1, t2) ->
-        match infer env chanEnv t1 with
-        | Some (TFun(a,b)) -> ty=b && check env chanEnv t2 a
-        | _ -> false 
+    | App (t1,t2) ->
+        match infer env chanEnv t2 with
+        | Some a -> 
+             check env chanEnv t1 (TFun(a,ty)) // the previous one worked when lambda was a second argument, this works when lambda is the first one
+        | None -> false 
     | Pair (t1, t2) ->
         match ty with
         | TPair (a, b) -> check env chanEnv t1 a && check env chanEnv t2 b
