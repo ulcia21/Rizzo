@@ -294,6 +294,26 @@ let mkSigType =
 //let resultmkSig = check env chanEnv mkSigAnnotated mkSigType
 //printfn "result of mkSig = %b, and its supposed to be true" resultmkSig its some infinite loop :0
 
+
+let mkSig2 = Fix ("r",
+                        Lambda ("da", 
+                            ApplyWhenV(
+                                Delay (
+                                    Lambda ("a", 
+                                        SignalCons(Var "a", 
+                                            ApplyWhenV( Var "r", Var "da") // I wanted ApplyLater but also doesnt work
+                                        )
+                                    )
+                                )
+                            , Var "da")
+                        ) 
+                    )
+ 
+let mkSigAnnotated =
+    Ann(mkSig2, mkSigType)
+
+let resultmkSig = check env chanEnv mkSigAnnotated mkSigType
+printfn "result of mkSig = %b, and its supposed to be true" resultmkSig
 //switch
 
 //map
@@ -333,6 +353,8 @@ let mapAnnotated =
 let resultmap = check env chanEnv mapAnnotated mapType
 printfn "result of map3 = %b, and its supposed to be true" resultmap
 
+// sample
+let sample xs ys = map3 //first annotate the thing in parenthasis as f then xs as idk 
 
 
 //fliter
