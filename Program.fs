@@ -109,13 +109,13 @@ let rec check env chanEnv te ty =
         | _ -> false
     | ApplyWhenV (w, v)-> 
         match infer env chanEnv v with
-        | Some (TExistsLater a) -> // try infer the v!! maybe that will fix the whole situation
+        | Some (TExistsLater a) -> 
             match ty with
             | TExistsLater b -> check env chanEnv w (TForallLater (TFun(a, b)))
             | _ -> false
         | _ -> false
     | ApplyLater (w, v) ->
-        match infer env chanEnv v with //try infer the v!! maybe that will fix the whole situation
+        match infer env chanEnv v with 
         | Some (TForallLater a) -> 
             match ty with
             | TForallLater b -> check env chanEnv w (TForallLater (TFun(a,b))) 
