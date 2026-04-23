@@ -30,13 +30,13 @@ type Term =
     | Case of Term * (string * Term) * (string * Term)
     | ApplyLater of Term * Term //apply delayed function to delayed argument s(*)t (any clock ticks)
     | ApplyWhenV of Term * Term // apply function whenever v ticks f(>)v (connected to exists later)
-    | Fix of string * Term //??
+    | Fix of string * Term 
     | Delay of Term
     | Wait of Term
     | Watch of Term
     | Head of Term
     | Tail of Term
-    | Sync of Term * Term //?
+    | Sync of Term * Term 
     | SignalCons of Term * Term // value, future value, signal constructor
     | Never 
     | Num of int
