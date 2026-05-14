@@ -1,6 +1,7 @@
 module Rizzo
 
 type Channel = string
+type Var = string
 
 type Type =
     | TVar of string
@@ -18,7 +19,7 @@ type Term =
     | Unit
     | TValue of Term
     | Ann of Term * Type
-    | Var of string
+    | Var of Var
     | Lambda of string * Term //applying function to variable, λx.t - a function that takes argument x and returns t.
     | App of Term * Term //function application t_1 t_2
     | Pair of Term * Term
@@ -27,7 +28,7 @@ type Term =
     | Snd of Term //PI_2
     | Inl of Term //left
     | Inr of Term // right
-    | Case of Term * (string * Term) * (string * Term)
+    | Case of Term * (Var * Term) * (Var * Term)
     | ApplyLater of Term * Term //apply delayed function to delayed argument s(*)t (any clock ticks)
     | ApplyWhenV of Term * Term // apply function whenever v ticks f(>)v (connected to exists later)
     | Fix of string * Term 
@@ -60,10 +61,10 @@ let rec isValue t =
     | _ -> false
 
 
-let rec check env chanEnv te ty = 
+let rec check (env: list<Var * Type>) (chanEnv: list<Channel * Type>) (te: Term) (ty: Type) : bool =
     match te with
     | Unit -> ty = TUnit
-    | Var x -> 
+    | Var x  -> 
         match List.tryFind (fun (y,_)-> x=y) env with
         | Some (_, t) -> t = ty
         | None -> false 
@@ -138,9 +139,11 @@ let rec check env chanEnv te ty =
         | Some (TSignal a) -> TExistsLater(TSignal a)=ty
         | _ -> false
     | Sync (t1, t2) ->
-        match infer env chanEnv t1, infer env chanEnv t2 with
-        | Some (TExistsLater a), Some (TExistsLater b) -> 
-            ty = TExistsLater(TSum(TSum(a,b), TPair(a,b)))
+        match ty with
+        | TExistsLater (TSum (TSum (a1, b1), TPair (a2, b2)))
+            when a1 = a2 && b1 = b2 ->
+                check env chanEnv t1 (TExistsLater a1)
+                && check env chanEnv t2 (TExistsLater b1)
         | _ -> false
     | SignalCons(s, t) ->
         match infer env chanEnv s with
@@ -167,7 +170,7 @@ let rec check env chanEnv te ty =
 // the real usage fix f. λn.
 //    if n == 0 then 1
 //    else n * f(n-1)
-and infer env chanEnv te =
+and infer (env: list<Var * Type>) (chanEnv: list<Channel * Type>) (te: Term) : Type option =
     match te with
     | Unit -> Some TUnit
     | Var x -> 
@@ -199,14 +202,14 @@ and infer env chanEnv te =
         | _ -> None
     | ApplyLater(w, v) ->
         match infer env chanEnv w with
-        | Some (TForallLater (TFun(a,b))) -> 
+        | Some (TForallLater (TFun(a,b))) ->
             if check env chanEnv v (TForallLater a) then
                 Some (TForallLater b)
             else None
         | _ -> None
     | ApplyWhenV (t1, t2) ->
         match infer env chanEnv t1 with
-        | Some (TForallLater (TFun(a,b))) ->
+        | Some (TForallLater (TFun(a,b))) -> 
             if check env chanEnv t2 (TExistsLater a) then
                 Some (TExistsLater b)
             else None
@@ -261,63 +264,44 @@ let chanEnv : ChanEnv = []
 //checking if annotating lambda x->x works
 let t1 = Ann(Lambda("x", Var "x"), TFun(TUnit, TUnit) )
 
-let check1 = check env chanEnv t1 (TFun(TUnit, TUnit))
-printfn "check1 = %b, and its supposed to be true" check1
+//annotation typing rule in inference mode
+let tinf = 
+    infer env chanEnv (Ann (Lambda("x", Var "x"), TFun(TUnit, TUnit))) = 
+        if check env chanEnv (Lambda("x", Var "x")) (TFun(TUnit, TUnit)) then Some (TFun(TUnit, TUnit)) else None
+printfn "Ann rule for inference = %b, and its supposed to be true" tinf
 
-let check2 = check env chanEnv t1 (TFun(TUnit, TVar "x"))
-printfn "check2 = %b, and its supposed to be false" check2
-
-
-//checking if app works 
-let t2 = App( Ann(Lambda("x", Var "x"), TFun(TUnit, TUnit) ), Unit)
-let infert2 = infer env chanEnv t2 
-printfn "infert2 = %A, and its supposed to be Some TUnit" infert2
-
-//using int 
-let t3 = App( Ann(Lambda("x", Add (Var "x", Num 1)), TFun(TInt, TInt) ), Num 3)
-let infert3 = infer env chanEnv t3 
-printfn "infert3 = %A, and its supposed to be Some TInt" infert3
-let check3 = check env chanEnv t3 TInt
-printfn "check3 = %b, and its supposed to be true" check3
 
 //mkSig
-let rec mkSig da  = Lambda("a", SignalCons(Var "a", mkSig (Wait da)) ) //whenever da updates we construct the signal from a
-// the type should be Exists A -> Exists Sig A
 let mkSigType =
     TFun(
         TExistsLater TUnit,
         TExistsLater(TSignal TUnit))
 
-//let mkSigAnnotated =
-    //Ann(mkSig (Chan "someChannel?"), mkSigType)
 
-//let resultmkSig = check env chanEnv mkSigAnnotated mkSigType
-//printfn "result of mkSig = %b, and its supposed to be true" resultmkSig its some infinite loop :0
-
-
-let mkSig2 = Fix ("r",
+let mkSig = Fix ("r",
                         Lambda ("da", 
                             ApplyWhenV(
-                                Delay (
-                                    Lambda ("a", 
-                                        SignalCons(Var "a", 
-                                            ApplyWhenV( Var "r", Var "da") // I wanted ApplyLater but also doesnt work
+                                ApplyLater(
+                                    Delay (
+                                        Lambda ("r'", 
+                                            Lambda ("a", 
+                                                SignalCons(Var "a", App (Var "r'", Var "da"))
+                                            )
                                         )
                                     )
-                                )
+                                , Var "r")
                             , Var "da")
                         ) 
                     )
  
 let mkSigAnnotated =
-    Ann(mkSig2, mkSigType)
+    Ann(mkSig, mkSigType)
 
 let resultmkSig = check env chanEnv mkSigAnnotated mkSigType
 printfn "result of mkSig = %b, and its supposed to be true" resultmkSig
-//switch
 
 //map
-let map3 = Fix ("r",
+let map = Fix ("r",
                     Lambda ("f", 
                         Lambda ("s", 
                             App ( 
@@ -348,13 +332,99 @@ let mapType =
     )
 
 let mapAnnotated =
-    Ann(map3, mapType)
+    Ann(map, mapType)
 
 let resultmap = check env chanEnv mapAnnotated mapType
-printfn "result of map3 = %b, and its supposed to be true" resultmap
+printfn "result of map = %b, and its supposed to be true" resultmap
 
-// sample
-let sample xs ys = map3 //first annotate the thing in parenthasis as f then xs as idk 
+//switch
+let switchType =
+    TFun(
+        TSignal TUnit,
+        TFun(TExistsLater (TSignal TUnit), TSignal TUnit)
+    )
 
 
-//fliter
+let switch =
+    Fix ("r",
+        Lambda ("s",
+            Lambda ("d",
+                SignalCons(
+                    Head (Var "s"),
+                    ApplyWhenV(
+                        // unfold r once
+                        ApplyLater(
+                            Delay (
+                                Lambda ("r'",
+                                    // cont function
+                                    Lambda ("z",
+                                        Case (Var "z",
+                                            // left: Inl (Inl xs')
+                                            ("l",
+                                                Case (Var "l",
+                                                    // xs'
+                                                    ("xs'",
+                                                        App(
+                                                            App(Var "r'", Var "xs'"),
+                                                            Var "d"
+                                                        )
+                                                    ),
+                                                    // right: Inl (Inr d')
+                                                    ("d'",
+                                                        Var "d'"
+                                                    )
+                                                )
+                                            ),
+                                            // both: Inr (Pair(_, d'))
+                                            ("p",
+                                                Snd (Var "p")
+                                            )
+                                        )
+                                    )
+                                )
+                            ),
+                            Var "r"
+                        ),
+
+                        Sync (Tail (Var "s"), Var "d")
+                    )
+                )
+            )
+        )
+    )
+let switchAnnotated =
+    Ann(switch, switchType)
+let resultswitch = check env chanEnv switchAnnotated switchType
+printfn "result of switch = %b, and its supposed to be true" resultswitch
+
+//tests for Case
+let caseTest = Case(Ann(Inl Unit, TSum(TUnit, TUnit)), ("x", Unit), ("y", Unit)) //inl needs annotation
+let checkCase = check env chanEnv caseTest TUnit
+printfn "checkCase = %b, and its supposed to be true" checkCase
+
+let caseTest2 = Case( Unit, ("x", Unit), ("y", Unit))
+let caseAnnotated =  Ann (caseTest2, TUnit)
+let checkCase2 = check env chanEnv caseAnnotated TUnit
+printfn "checkCase2 = %b, and its supposed to be true" checkCase
+
+//tests fot very simple functions
+let check1 = check env chanEnv t1 (TFun(TUnit, TUnit))
+printfn "check1 = %b, and its supposed to be true" check1
+
+let check2 = check env chanEnv t1 (TFun(TUnit, TVar "x"))
+printfn "check2 = %b, and its supposed to be false" check2
+
+
+//tests for App 
+let t2 = App( Ann(Lambda("x", Var "x"), TFun(TUnit, TUnit) ), Unit)
+let infert2 = infer env chanEnv t2 
+printfn "infert2 = %A, and its supposed to be Some TUnit" infert2
+
+//tests with Int
+let t3 = App( Ann(Lambda("x", Add (Var "x", Num 1)), TFun(TInt, TInt) ), Num 3)
+let infert3 = infer env chanEnv t3 
+printfn "infert3 = %A, and its supposed to be Some TInt" infert3
+let check3 = check env chanEnv t3 TInt
+printfn "check3 = %b, and its supposed to be true" check3
+
+
