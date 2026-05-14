@@ -255,7 +255,7 @@ and infer (env: list<Var * Type>) (chanEnv: list<Channel * Type>) (te: Term) : T
 
 // no in, no lambda and Never in infer
 
-type Env = (string * Type) list
+type Env = (Var * Type) list
 type ChanEnv = (Channel *Type) list 
 
 let env : Env = []
